@@ -1,488 +1,278 @@
-# Agents TUI
+# @mariozechner/pi-tui
 
-A minimal, high-performance Terminal User Interface framework designed for chat-based agent interfaces. Built for Node.js with a focus on differential rendering and clean component architecture.
+Minimal terminal UI framework with differential rendering and synchronized output for flicker-free interactive CLI applications.
 
-## Why Build Your Own TUI?
+## Features
 
-This framework was created because existing solutions like Ink, Blessed, and OpenTUI didn't fit the needs of a streaming chat interface. Rather than fight against the terminal or write React-like TUI code, this package:
-
-- ( Treats the terminal's scrollback buffer as a feature, not a bug
-- <� Uses natural terminal scrolling and search functionality
-- � Only redraws what changed (differential rendering)
-- >� Provides a simple component model with minimal overhead
-- =� Supports output streaming and real-time updates
+- **Differential Rendering**: Three-strategy rendering system that only updates what changed
+- **Synchronized Output**: Uses CSI 2026 for atomic screen updates (no flicker)
+- **Bracketed Paste Mode**: Handles large pastes correctly with markers for >10 line pastes
+- **Component-based**: Simple Component interface with render() method
+- **Built-in Components**: Text, Input, Editor, Markdown, Loader, SelectList, Spacer
+- **Autocomplete Support**: File paths and slash commands
 
 ## Quick Start
 
-### Installation
-
-```bash
-npm install @ank1015/agents-tui
-```
-
-### Basic Usage
-
 ```typescript
-import { TUI, Container, Text, Input, ProcessTerminal } from '@ank1015/agents-tui';
+import { TUI, Text, Editor, ProcessTerminal } from "@mariozechner/pi-tui";
 
-// Create a terminal and TUI
+// Create terminal
 const terminal = new ProcessTerminal();
+
+// Create TUI
 const tui = new TUI(terminal);
 
 // Add components
-tui.addChild(new Text("Welcome to my TUI!"));
-const input = new Input("Enter something: ");
-tui.addChild(input);
+tui.addChild(new Text("Welcome to my app!"));
 
-// Set focus and start
-tui.setFocus(input);
+const editor = new Editor();
+editor.onSubmit = (text) => {
+	console.log("Submitted:", text);
+	tui.addChild(new Text(`You said: ${text}`));
+};
+tui.addChild(editor);
+
+// Start
 tui.start();
 ```
 
-## Architecture
+## Core API
 
-### Core Concepts
+### TUI
 
-**Components** are the building blocks. Every UI element is a component that implements this simple interface:
+Main container that manages components and rendering.
+
+```typescript
+const tui = new TUI(terminal);
+tui.addChild(component);
+tui.removeChild(component);
+tui.start();
+tui.stop();
+tui.requestRender(); // Request a re-render
+```
+
+### Component Interface
+
+All components implement:
 
 ```typescript
 interface Component {
-  render(width: number): string[];           // Render to lines
-  handleInput?(data: string): void;          // Handle keyboard input
-  invalidate(): void;                        // Clear cached render
+	render(width: number): string[];
+	handleInput?(data: string): void;
 }
 ```
 
-**Container** holds multiple components and renders them vertically:
+## Built-in Components
+
+### Container
+
+Groups child components.
 
 ```typescript
 const container = new Container();
-container.addChild(textComponent);
-container.addChild(inputComponent);
+container.addChild(component);
+container.removeChild(component);
 ```
-
-**TUI** is the main orchestrator that:
-- Manages the terminal connection
-- Handles rendering with differential updates
-- Routes keyboard input to focused component
-- Tracks terminal dimensions
-
-### Differential Rendering
-
-The key to performance. Instead of redrawing everything every time:
-
-1. **First render**: Output all content
-2. **Normal update**: Find first changed line, move cursor there, update to end
-3. **Width changed**: Full clear and re-render (soft wrapping changed)
-4. **Scrolled up**: Full re-render (can't write to scrollback above viewport)
-
-All writes are wrapped in synchronized output (`CSI ?2026h/l`) to eliminate flicker.
-
-## Components
 
 ### Text
 
-Display static or dynamic text with word wrapping and padding.
+Displays multi-line text with word wrapping and padding.
 
 ```typescript
-import { Text } from '@ank1015/agents-tui';
-
-const text = new Text("Hello world", paddingX = 1, paddingY = 1);
+const text = new Text("Hello World", paddingX, paddingY); // defaults: 1, 1
 text.setText("Updated text");
-tui.addChild(text);
 ```
-
-**Features:**
-- Word wrapping to terminal width
-- ANSI color/style preservation
-- Custom background function
-- Padding control
-
----
 
 ### Input
 
-Single-line text input with keyboard handling.
+Single-line text input with horizontal scrolling.
 
 ```typescript
-import { Input } from '@ank1015/agents-tui';
-
-const input = new Input("Enter text: ", theme);
-input.onSubmit = (value) => {
-  console.log("User entered:", value);
-};
-tui.setFocus(input);
+const input = new Input();
+input.onSubmit = (value) => console.log(value);
+input.setValue("initial");
 ```
 
-**Features:**
-- Character input and editing
-- Cursor positioning
-- Tab completion (with autocomplete provider)
-- Enter to submit, Ctrl+C to cancel
-
----
+**Key Bindings:**
+- `Enter` - Submit
+- `Ctrl+A` / `Ctrl+E` - Line start/end
+- `Ctrl+W` or `Option+Backspace` - Delete word backwards
+- `Ctrl+U` - Delete to start of line
+- `Ctrl+K` - Delete to end of line
+- Arrow keys, Backspace, Delete work as expected
 
 ### Editor
 
-Multi-line text editor with syntax highlighting support.
+Multi-line text editor with autocomplete, file completion, and paste handling.
 
 ```typescript
-import { Editor } from '@ank1015/agents-tui';
-
-const editor = new Editor(theme);
-editor.onSubmit = (value) => {
-  // User pressed Ctrl+Enter to submit
-};
+const editor = new Editor();
+editor.onSubmit = (text) => console.log(text);
+editor.onChange = (text) => console.log("Changed:", text);
+editor.disableSubmit = true; // Disable submit temporarily
 editor.setAutocompleteProvider(provider);
-tui.setFocus(editor);
 ```
 
 **Features:**
-- Multi-line editing
-- Autocomplete support
-- Customizable theme
-- Submit via Ctrl+Enter
+- Multi-line editing with word wrap
+- Slash command autocomplete (type `/`)
+- File path autocomplete (press `Tab`)
+- Large paste handling (>10 lines creates `[paste #1 +50 lines]` marker)
+- Horizontal lines above/below editor
+- Fake cursor rendering (hidden real cursor)
 
----
-
-### Loader
-
-Animated spinner component for showing activity.
-
-```typescript
-import { Loader } from '@ank1015/agents-tui';
-
-const loader = new Loader(
-  tui,
-  (s) => chalk.cyan(s),      // Spinner color function
-  (s) => chalk.dim(s),       // Message color function
-  "Loading..."
-);
-
-// Later, when done:
-tui.removeChild(loader);
-```
-
-**Features:**
-- 10-frame braille spinner animation
-- Customizable colors via functions
-- Auto-updates every 80ms
-
----
+**Key Bindings:**
+- `Enter` - Submit
+- `Shift+Enter`, `Ctrl+Enter`, or `Alt+Enter` - New line (terminal-dependent, Alt+Enter most reliable)
+- `Tab` - Autocomplete
+- `Ctrl+K` - Delete line
+- `Ctrl+A` / `Ctrl+E` - Line start/end
+- Arrow keys, Backspace, Delete work as expected
 
 ### Markdown
 
-Renders markdown with syntax highlighting and colors.
+Renders markdown with syntax highlighting and optional background colors.
 
 ```typescript
-import { Markdown } from '@ank1015/agents-tui';
-
-const md = new Markdown("# Hello\n\nThis is **bold** text", 1, 1, theme);
-tui.addChild(md);
+const md = new Markdown(
+	"# Hello\n\nSome **bold** text",
+	bgColor,           // optional: "bgRed", "bgBlue", etc.
+	fgColor,           // optional: "white", "cyan", etc.
+	customBgRgb,       // optional: { r: 52, g: 53, b: 65 }
+	paddingX,          // optional: default 1
+	paddingY           // optional: default 1
+);
+md.setText("Updated markdown");
 ```
 
 **Features:**
-- Full markdown parsing with `marked`
-- ANSI color codes for syntax highlighting
-- Themeable (headers, bold, code, links, etc.)
-- Preserves code block formatting
+- Headings, bold, italic, code blocks, lists, links, blockquotes
+- Syntax highlighting with chalk
+- Optional background colors (including custom RGB)
+- Padding support
+- Render caching for performance
 
----
+### Loader
+
+Animated loading spinner.
+
+```typescript
+const loader = new Loader(tui, "Loading...");
+loader.start();
+loader.stop();
+```
 
 ### SelectList
 
-Interactive list for selecting items.
+Interactive selection list with keyboard navigation.
 
 ```typescript
-import { SelectList, SelectItem } from '@ank1015/agents-tui';
+const list = new SelectList([
+	{ value: "opt1", label: "Option 1", description: "First option" },
+	{ value: "opt2", label: "Option 2", description: "Second option" },
+], 5); // maxVisible
 
-const items: SelectItem[] = [
-  { text: "Option 1", value: "opt1" },
-  { text: "Option 2", value: "opt2" },
-];
-
-const list = new SelectList(items, theme);
-list.onSelect = (item) => {
-  console.log("Selected:", item);
-};
-tui.setFocus(list);
+list.onSelect = (item) => console.log("Selected:", item);
+list.onCancel = () => console.log("Cancelled");
+list.setFilter("opt"); // Filter items
 ```
 
-**Features:**
-- Arrow key navigation
-- Enter to select
-- Customizable theme
-
----
-
-### TruncatedText
-
-Text that cuts off with ellipsis if it doesn't fit.
-
-```typescript
-import { TruncatedText } from '@ank1015/agents-tui';
-
-const text = new TruncatedText("Very long text...", width = 20);
-```
-
----
+**Controls:**
+- Arrow keys: Navigate
+- Enter or Tab: Select
+- Escape: Cancel
 
 ### Spacer
 
-Empty space between components.
+Empty lines for vertical spacing.
 
 ```typescript
-import { Spacer } from '@ank1015/agents-tui';
-
-tui.addChild(new Text("Top"));
-tui.addChild(new Spacer(3)); // 3 empty lines
-tui.addChild(new Text("Bottom"));
-```
-
----
-
-## Complete Example: Chat Interface
-
-See `test/chat-simple.ts` for a working example:
-
-```typescript
-import chalk from "chalk";
-import { CombinedAutocompleteProvider } from "../src/autocomplete.js";
-import { Editor } from "../src/components/editor.js";
-import { Loader } from "../src/components/loader.js";
-import { Markdown } from "../src/components/markdown.js";
-import { Text } from "../src/components/text.js";
-import { ProcessTerminal } from "../src/terminal.js";
-import { TUI } from "../src/tui.js";
-
-// Create terminal and TUI
-const terminal = new ProcessTerminal();
-const tui = new TUI(terminal);
-
-// Add welcome message
-tui.addChild(new Text("Welcome to Simple Chat!"));
-
-// Create editor with autocomplete
-const editor = new Editor(defaultEditorTheme);
-const autocompleteProvider = new CombinedAutocompleteProvider(
-  [
-    { name: "delete", description: "Delete the last message" },
-    { name: "clear", description: "Clear all messages" },
-  ],
-  process.cwd(),
-);
-editor.setAutocompleteProvider(autocompleteProvider);
-tui.addChild(editor);
-tui.setFocus(editor);
-
-// Handle submissions
-editor.onSubmit = (value: string) => {
-  const trimmed = value.trim();
-
-  // Handle slash commands
-  if (trimmed === "/delete") {
-    const children = tui.children;
-    if (children.length > 3) {
-      children.splice(children.length - 2, 1);
-    }
-    tui.requestRender();
-    return;
-  }
-
-  if (trimmed) {
-    // Add user message
-    tui.children.splice(
-      tui.children.length - 1,
-      0,
-      new Markdown(value, 1, 1, defaultMarkdownTheme)
-    );
-
-    // Show loading spinner
-    const loader = new Loader(
-      tui,
-      (s) => chalk.cyan(s),
-      (s) => chalk.dim(s),
-      "Thinking...",
-    );
-    tui.children.splice(tui.children.length - 1, 0, loader);
-    tui.requestRender();
-
-    // Simulate response
-    setTimeout(() => {
-      tui.removeChild(loader);
-      const response = "That's interesting!";
-      tui.children.splice(
-        tui.children.length - 1,
-        0,
-        new Markdown(response, 1, 1, defaultMarkdownTheme)
-      );
-      tui.requestRender();
-    }, 1000);
-  }
-};
-
-// Start the TUI
-tui.start();
-```
-
-## Testing
-
-A virtual terminal implementation is provided for testing:
-
-```typescript
-import { VirtualTerminal } from './test/virtual-terminal';
-import { TUI } from './src/tui';
-
-const terminal = new VirtualTerminal(80, 24);
-const tui = new TUI(terminal);
-
-// Add components and test
-tui.addChild(new Text("Test content"));
-tui.requestRender();
-
-// Get the rendered viewport
-const viewport = await terminal.flushAndGetViewport();
-```
-
-**VirtualTerminal Methods:**
-- `sendInput(data)`: Simulate keyboard input
-- `resize(cols, rows)`: Change terminal dimensions
-- `flushAndGetViewport()`: Get visible screen content
-- `getScrollBuffer()`: Get entire scrollback
-- `getCursorPosition()`: Get cursor x,y
-
-## Terminal Interface
-
-The framework abstracts the terminal behind a `Terminal` interface:
-
-```typescript
-interface Terminal {
-  start(onInput, onResize): void;
-  stop(): void;
-  write(data: string): void;
-  get columns(): number;
-  get rows(): number;
-  moveBy(lines: number): void;
-  hideCursor(): void;
-  showCursor(): void;
-  clearLine(): void;
-  clearFromCursor(): void;
-  clearScreen(): void;
-}
-```
-
-Two implementations provided:
-- **ProcessTerminal**: Uses `process.stdin/stdout` for real terminals
-- **VirtualTerminal**: Uses xterm.js for testing
-
-## Utilities
-
-### visibleWidth
-
-Calculate the visible width of text with ANSI codes:
-
-```typescript
-import { visibleWidth } from '@ank1015/agents-tui';
-
-const text = "\x1b[31mRed text\x1b[0m"; // Red + "Red text" + reset
-console.log(visibleWidth(text)); // 8 (not including ANSI codes)
-```
-
-### truncateToWidth
-
-Truncate text to fit a width while preserving ANSI codes:
-
-```typescript
-import { truncateToWidth } from '@ank1015/agents-tui';
-
-const text = "\x1b[31mHello world\x1b[0m";
-const truncated = truncateToWidth(text, 5); // "\x1b[31mHello\x1b[0m"
+const spacer = new Spacer(2); // 2 empty lines (default: 1)
 ```
 
 ## Autocomplete
 
-Provide autocomplete suggestions for input fields:
+### CombinedAutocompleteProvider
+
+Supports both slash commands and file paths.
 
 ```typescript
-import { CombinedAutocompleteProvider } from '@ank1015/agents-tui';
+import { CombinedAutocompleteProvider } from "@mariozechner/pi-tui";
 
 const provider = new CombinedAutocompleteProvider(
-  [
-    { name: "help", description: "Show help" },
-    { name: "clear", description: "Clear screen" },
-  ],
-  process.cwd() // For file completion
+	[
+		{ name: "help", description: "Show help" },
+		{ name: "clear", description: "Clear screen" },
+		{ name: "delete", description: "Delete last message" },
+	],
+	process.cwd() // base path for file completion
 );
 
 editor.setAutocompleteProvider(provider);
 ```
 
 **Features:**
-- Slash command completion
-- File/directory completion
-- Customizable items
+- Type `/` to see slash commands
+- Press `Tab` for file path completion
+- Works with `~/`, `./`, `../`, and `@` prefix
+- Filters to attachable files for `@` prefix
 
-## Performance
+## Differential Rendering
 
-- **Memory**: A few hundred kilobytes for large sessions (stores scrollback buffer)
-- **CPU**: Minimal - components cache renders, only changed lines update
-- **Rendering**: Sub-millisecond for typical updates (differential rendering)
+The TUI uses three rendering strategies:
 
-## Flicker Behavior
+1. **First Render**: Output all lines without clearing scrollback
+2. **Width Changed or Change Above Viewport**: Clear screen and full re-render
+3. **Normal Update**: Move cursor to first changed line, clear to end, render changed lines
 
-Synchronized output (`CSI ?2026h/l`) eliminates flicker in capable terminals:
+All updates are wrapped in **synchronized output** (`\x1b[?2026h` ... `\x1b[?2026l`) for atomic, flicker-free rendering.
 
-- **Good**: Ghostty, iTerm2, modern terminal emulators
-- **Some flicker**: VS Code built-in terminal, xterm.js
-- **Still better than**: Many other TUI frameworks
+## Terminal Interface
 
-## Key Design Decisions
+The TUI works with any object implementing the `Terminal` interface:
 
-1. **Stream-based, not full-screen**: Preserves terminal scrollback and native scrolling
-2. **Minimal component API**: Just `render()` and optional `handleInput()`
-3. **Explicit layout**: No complex layout engine, just vertical stacking
-4. **Caching strategy**: Components cache rendered output, TUI does differential rendering
-5. **ANSI escape codes**: Full support for colors and styling
-
-## File Structure
-
+```typescript
+interface Terminal {
+	start(onInput: (data: string) => void, onResize: () => void): void;
+	stop(): void;
+	write(data: string): void;
+	get columns(): number;
+	get rows(): number;
+	moveBy(lines: number): void;
+	hideCursor(): void;
+	showCursor(): void;
+	clearLine(): void;
+	clearFromCursor(): void;
+	clearScreen(): void;
+}
 ```
-src/
-  tui.ts              # Main TUI class with differential rendering
-  terminal.ts         # Terminal interface & ProcessTerminal
-  autocomplete.ts     # Autocomplete provider system
-  utils.ts            # Text wrapping, width calculation
-  components/
-      text.ts         # Static/dynamic text
-      input.ts        # Single-line input
-      editor.ts       # Multi-line editor
-      markdown.ts     # Markdown renderer
-      loader.ts       # Spinner animation
-      select-list.ts  # Item picker
-      spacer.ts       # Empty space
-      truncated-text.ts # Ellipsis text
+
+**Built-in implementations:**
+- `ProcessTerminal` - Uses `process.stdin/stdout`
+- `VirtualTerminal` - For testing (uses `@xterm/headless`)
+
+## Example
+
+See `test/chat-simple.ts` for a complete chat interface example with:
+- Markdown messages with custom background colors
+- Loading spinner during responses
+- Editor with autocomplete and slash commands
+- Spacers between messages
+
+Run it:
+```bash
+npx tsx test/chat-simple.ts
 ```
 
 ## Development
 
 ```bash
-# Build
-npm run build
+# Install dependencies (from monorepo root)
+npm install
 
-# Watch mode
-npm run dev
-
-# Format & type check
+# Run type checking
 npm run check
 
-# Run tests
-npm run test
-
-# Run examples
-npx ts-node test/chat-simple.ts
-npx ts-node test/key-tester.ts
+# Run the demo
+npx tsx test/chat-simple.ts
 ```
-
-## License
-
-MIT
