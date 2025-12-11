@@ -7,10 +7,10 @@ A minimal, high-performance Terminal User Interface framework designed for chat-
 This framework was created because existing solutions like Ink, Blessed, and OpenTUI didn't fit the needs of a streaming chat interface. Rather than fight against the terminal or write React-like TUI code, this package:
 
 - ( Treats the terminal's scrollback buffer as a feature, not a bug
-- <¯ Uses natural terminal scrolling and search functionality
-- ¡ Only redraws what changed (differential rendering)
-- >é Provides a simple component model with minimal overhead
-- =æ Supports output streaming and real-time updates
+- <ï¿½ Uses natural terminal scrolling and search functionality
+- ï¿½ Only redraws what changed (differential rendering)
+- >ï¿½ Provides a simple component model with minimal overhead
+- =ï¿½ Supports output streaming and real-time updates
 
 ## Quick Start
 
@@ -448,19 +448,19 @@ Synchronized output (`CSI ?2026h/l`) eliminates flicker in capable terminals:
 
 ```
 src/
-   tui.ts              # Main TUI class with differential rendering
-   terminal.ts         # Terminal interface & ProcessTerminal
-   autocomplete.ts     # Autocomplete provider system
-   utils.ts            # Text wrapping, width calculation
-   components/
-       text.ts         # Static/dynamic text
-       input.ts        # Single-line input
-       editor.ts       # Multi-line editor
-       markdown.ts     # Markdown renderer
-       loader.ts       # Spinner animation
-       select-list.ts  # Item picker
-       spacer.ts       # Empty space
-       truncated-text.ts # Ellipsis text
+  tui.ts              # Main TUI class with differential rendering
+  terminal.ts         # Terminal interface & ProcessTerminal
+  autocomplete.ts     # Autocomplete provider system
+  utils.ts            # Text wrapping, width calculation
+  components/
+      text.ts         # Static/dynamic text
+      input.ts        # Single-line input
+      editor.ts       # Multi-line editor
+      markdown.ts     # Markdown renderer
+      loader.ts       # Spinner animation
+      select-list.ts  # Item picker
+      spacer.ts       # Empty space
+      truncated-text.ts # Ellipsis text
 ```
 
 ## Development
