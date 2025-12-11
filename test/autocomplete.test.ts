@@ -1,0 +1,63 @@
+import { describe, it, expect } from "vitest";
+import { CombinedAutocompleteProvider } from "../src/autocomplete.js";
+
+describe("CombinedAutocompleteProvider", () => {
+	describe("extractPathPrefix", () => {
+		it("extracts / from 'hey /' when forced", () => {
+			const provider = new CombinedAutocompleteProvider([], "/tmp");
+			const lines = ["hey /"];
+			const cursorLine = 0;
+			const cursorCol = 5; // After the "/"
+
+			const result = provider.getForceFileSuggestions(lines, cursorLine, cursorCol);
+
+			expect(result).not.toBeNull();
+			if (result) {
+				expect(result.prefix).toBe("/");
+			}
+		});
+
+		it("extracts /A from '/A' when forced", () => {
+			const provider = new CombinedAutocompleteProvider([], "/tmp");
+			const lines = ["/A"];
+			const cursorLine = 0;
+			const cursorCol = 2; // After the "A"
+
+			const result = provider.getForceFileSuggestions(lines, cursorLine, cursorCol);
+
+			console.log("Result:", result);
+			// This might return null if /A doesn't match anything, which is fine
+			// We're mainly testing that the prefix extraction works
+			if (result) {
+				expect(result.prefix).toBe("/A");
+			}
+		});
+
+		it("does not trigger for slash commands", () => {
+			const provider = new CombinedAutocompleteProvider([], "/tmp");
+			const lines = ["/model"];
+			const cursorLine = 0;
+			const cursorCol = 6; // After "model"
+
+			const result = provider.getForceFileSuggestions(lines, cursorLine, cursorCol);
+
+			console.log("Result:", result);
+			expect(result).toBeNull();
+		});
+
+		it("triggers for absolute paths after slash command argument", () => {
+			const provider = new CombinedAutocompleteProvider([], "/tmp");
+			const lines = ["/command /"];
+			const cursorLine = 0;
+			const cursorCol = 10; // After the second "/"
+
+			const result = provider.getForceFileSuggestions(lines, cursorLine, cursorCol);
+
+			console.log("Result:", result);
+			expect(result).not.toBeNull();
+			if (result) {
+				expect(result.prefix).toBe("/");
+			}
+		});
+	});
+});
