@@ -5,9 +5,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Terminal } from "./terminal";
-import { getCapabilities, setCellDimensions } from "./terminal-image";
-import { visibleWidth } from "./utils";
+import type { Terminal } from "./terminal.js";
+import { getCapabilities, setCellDimensions } from "./terminal-image.js";
+import { visibleWidth } from "./utils.js";
 
 /**
  * Component interface - all components must implement this
@@ -299,7 +299,7 @@ export class TUI extends Container {
 			const isImageLine = this.containsImage(line);
 			if (!isImageLine && visibleWidth(line) > width) {
 				// Log all lines to crash file for debugging
-				const crashLogPath = path.join(os.homedir(), ".pi", "agent", "pi-crash.log");
+				const crashLogPath = path.join(os.homedir(), ".max", "agent", "max-crash.log");
 				const crashData = [
 					`Crash at ${new Date().toISOString()}`,
 					`Terminal width: ${width}`,

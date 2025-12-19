@@ -6,19 +6,37 @@ export {
 	type AutocompleteProvider,
 	CombinedAutocompleteProvider,
 	type SlashCommand,
-} from "./autocomplete";
+} from "./autocomplete.js";
 // Components
-export { Editor, type EditorTheme } from "./components/editor";
-export { Image, type ImageOptions, type ImageTheme } from "./components/image";
-export { Input } from "./components/input";
-export { Loader } from "./components/loader";
-export { type DefaultTextStyle, Markdown, type MarkdownTheme } from "./components/markdown";
-export { type SelectItem, SelectList, type SelectListTheme } from "./components/select-list";
-export { Spacer } from "./components/spacer";
-export { Text } from "./components/text";
-export { TruncatedText } from "./components/truncated-text";
+export { Box } from "./components/box.js";
+export { Editor, type EditorTheme } from "./components/editor.js";
+export { Image, type ImageOptions, type ImageTheme } from "./components/image.js";
+export { Input } from "./components/input.js";
+export { Loader } from "./components/loader.js";
+export { type DefaultTextStyle, Markdown, type MarkdownTheme } from "./components/markdown.js";
+export { type SelectItem, SelectList, type SelectListTheme } from "./components/select-list.js";
+export { Spacer } from "./components/spacer.js";
+export { Text } from "./components/text.js";
+export { TruncatedText } from "./components/truncated-text.js";
+// Kitty keyboard protocol helpers
+export {
+	isAltBackspace,
+	isCtrlA,
+	isCtrlC,
+	isCtrlD,
+	isCtrlE,
+	isCtrlK,
+	isCtrlO,
+	isCtrlP,
+	isCtrlT,
+	isCtrlU,
+	isCtrlW,
+	isEscape,
+	isShiftTab,
+	Keys,
+} from "./keys.js";
 // Terminal interface and implementations
-export { ProcessTerminal, type Terminal } from "./terminal";
+export { ProcessTerminal, type Terminal } from "./terminal.js";
 // Terminal image support
 export {
 	type CellDimensions,
@@ -41,7 +59,7 @@ export {
 	resetCapabilitiesCache,
 	setCellDimensions,
 	type TerminalCapabilities,
-} from "./terminal-image";
-export { type Component, Container, TUI } from "./tui";
+} from "./terminal-image.js";
+export { type Component, Container, TUI } from "./tui.js";
 // Utilities
-export { truncateToWidth, visibleWidth } from "./utils";
+export { truncateToWidth, visibleWidth } from "./utils.js";

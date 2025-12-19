@@ -1,5 +1,6 @@
-import type { Component } from "../tui";
-import { truncateToWidth } from "../utils";
+import { isCtrlC, isEscape } from "../keys.js";
+import type { Component } from "../tui.js";
+import { truncateToWidth } from "../utils.js";
 
 export interface SelectItem {
 	value: string;
@@ -162,7 +163,7 @@ export class SelectList implements Component {
 			}
 		}
 		// Escape or Ctrl+C
-		else if (keyData === "\x1b" || keyData === "\x03") {
+		else if (isEscape(keyData) || isCtrlC(keyData)) {
 			if (this.onCancel) {
 				this.onCancel();
 			}
