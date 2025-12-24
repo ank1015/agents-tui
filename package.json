@@ -1,6 +1,6 @@
 {
 	"name": "@ank1015/agents-tui",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Terminal User Interface library with differential rendering",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -12,8 +12,17 @@
 		"check": "biome check --write . && tsc --noEmit",
 		"test": "vitest --run"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": ["tui", "terminal", "cli", "ui", "terminal-ui", "differential-rendering", "interactive"],
+	"repository": {
+    	"type": "git",
+    	"url": "git+https://github.com/ank1015/agents-tui.git"
+  	},
+  	"bugs": {
+    	"url": "https://github.com/ank1015/agents-tui/issues"
+  	},
+  	"homepage": "https://github.com/ank1015/agents-tui#readme",
+	"files": ["dist", "README.md", "LICENSE"],
+	"author": "ank1015",
 	"license": "MIT",
 	"dependencies": {
 		"@types/mime-types": "^2.1.4",
