@@ -1194,7 +1194,7 @@ export class Editor implements Component {
 
 		if (suggestions && suggestions.items.length > 0) {
 			this.autocompletePrefix = suggestions.prefix;
-			this.autocompleteList = new SelectList(suggestions.items, 5, this.theme.selectList);
+			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 			this.isAutocompleting = true;
 		} else {
 			this.cancelAutocomplete();
@@ -1244,7 +1244,7 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 
 		if (suggestions && suggestions.items.length > 0) {
 			this.autocompletePrefix = suggestions.prefix;
-			this.autocompleteList = new SelectList(suggestions.items, 5, this.theme.selectList);
+			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 			this.isAutocompleting = true;
 		} else {
 			this.cancelAutocomplete();
@@ -1273,7 +1273,7 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 		if (suggestions && suggestions.items.length > 0) {
 			this.autocompletePrefix = suggestions.prefix;
 			// Always create new SelectList to ensure update
-			this.autocompleteList = new SelectList(suggestions.items, 5, this.theme.selectList);
+			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 		} else {
 			// No matches - check if we're still in a valid context before cancelling
 			const currentLine = this.state.lines[this.state.cursorLine] || "";
