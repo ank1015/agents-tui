@@ -113,6 +113,19 @@ export class TUI extends Container {
 		this.terminal.write("\x1b[16t");
 	}
 
+	/**
+	 * Force a full re-render of the TUI.
+	 * Clears the screen and resets internal state to force a fresh render.
+	 */
+	fullRefresh(): void {
+		this.previousLines = [];
+		this.previousWidth = 0;
+		this.cursorRow = 0;
+		// Clear scrollback, entire screen and move to home
+		this.terminal.write("\x1b[3J\x1b[2J\x1b[H");
+		this.requestRender();
+	}
+
 	stop(): void {
 		this.terminal.showCursor();
 		this.terminal.stop();
