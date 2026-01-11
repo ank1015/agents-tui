@@ -1,7 +1,7 @@
 import type { AutocompleteProvider, CombinedAutocompleteProvider } from "../autocomplete.js";
 import { isAltBackspace, isCtrlA, isCtrlC, isCtrlE, isCtrlK, isCtrlU, isCtrlW, isEscape, Keys } from "../keys.js";
 import type { Component } from "../tui.js";
-import { visibleWidth } from "../utils.js";
+import { applyBackgroundToLine, visibleWidth } from "../utils.js";
 import { SelectList, type SelectListTheme } from "./select-list.js";
 
 // Grapheme segmenter for proper Unicode iteration (handles emojis, etc.)
@@ -21,6 +21,7 @@ interface LayoutLine {
 
 export interface EditorTheme {
 	borderColor: (str: string) => string;
+	bgColor?: (str: string) => string;
 	selectList: SelectListTheme;
 }
 
@@ -164,14 +165,16 @@ export class Editor implements Component {
 					const afterGraphemes = [...segmenter.segment(after)];
 					const firstGrapheme = afterGraphemes[0]?.segment || "";
 					const restAfter = after.slice(firstGrapheme.length);
-					const cursor = `\x1b[7m${firstGrapheme}\x1b[0m`;
+					// Use \x1b[27m (inverse off) instead of \x1b[0m (full reset) to preserve background
+					const cursor = `\x1b[7m${firstGrapheme}\x1b[27m`;
 					displayText = before + cursor + restAfter;
 					// lineVisibleWidth stays the same - we're replacing, not adding
 				} else {
 					// Cursor is at the end - check if we have room for the space
 					if (lineVisibleWidth < width) {
 						// We have room - add highlighted space
-						const cursor = "\x1b[7m \x1b[0m";
+						// Use \x1b[27m (inverse off) instead of \x1b[0m (full reset) to preserve background
+						const cursor = "\x1b[7m \x1b[27m";
 						displayText = before + cursor;
 						// lineVisibleWidth increases by 1 - we're adding a space
 						lineVisibleWidth = lineVisibleWidth + 1;
@@ -181,7 +184,8 @@ export class Editor implements Component {
 						const beforeGraphemes = [...segmenter.segment(before)];
 						if (beforeGraphemes.length > 0) {
 							const lastGrapheme = beforeGraphemes[beforeGraphemes.length - 1]?.segment || "";
-							const cursor = `\x1b[7m${lastGrapheme}\x1b[0m`;
+							// Use \x1b[27m (inverse off) instead of \x1b[0m (full reset) to preserve background
+							const cursor = `\x1b[7m${lastGrapheme}\x1b[27m`;
 							// Rebuild 'before' without the last grapheme
 							const beforeWithoutLast = beforeGraphemes
 								.slice(0, -1)
@@ -198,7 +202,11 @@ export class Editor implements Component {
 			const padding = " ".repeat(Math.max(0, width - lineVisibleWidth));
 
 			// Render the line (no side borders, just horizontal lines above and below)
-			result.push(displayText + padding);
+			let line = displayText + padding;
+			if (this.theme.bgColor) {
+				line = applyBackgroundToLine(line, width, this.theme.bgColor);
+			}
+			result.push(line);
 		}
 
 		// Render bottom border

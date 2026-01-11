@@ -217,6 +217,9 @@ export class TUI extends Container {
 		// Width changed - need full re-render
 		const widthChanged = this.previousWidth !== 0 && this.previousWidth !== width;
 
+		// Height (line count) changed - need full re-render to avoid gaps
+		const lineCountChanged = this.previousLines.length !== 0 && this.previousLines.length !== newLines.length;
+
 		// First render - just output everything without clearing
 		if (this.previousLines.length === 0) {
 			let buffer = "\x1b[?2026h"; // Begin synchronized output
@@ -233,8 +236,8 @@ export class TUI extends Container {
 			return;
 		}
 
-		// Width changed - full re-render
-		if (widthChanged) {
+		// Width or line count changed - full re-render
+		if (widthChanged || lineCountChanged) {
 			let buffer = "\x1b[?2026h"; // Begin synchronized output
 			buffer += "\x1b[3J\x1b[2J\x1b[H"; // Clear scrollback, screen, and home
 			for (let i = 0; i < newLines.length; i++) {
