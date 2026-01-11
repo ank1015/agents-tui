@@ -11,7 +11,7 @@ export {
 export { Box } from "./components/box.js";
 export { DynamicSpacer } from "./components/dynamic-spacer.js";
 export { FullScreenBox } from "./components/full-screen-box.js";
-export { Editor, type EditorTheme } from "./components/editor.js";
+export { Editor, type EditorOptions, type EditorTheme } from "./components/editor.js";
 export { Image, type ImageOptions, type ImageTheme } from "./components/image.js";
 export { Input } from "./components/input.js";
 export { Loader } from "./components/loader.js";

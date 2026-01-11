@@ -25,6 +25,23 @@ export interface EditorTheme {
 	selectList: SelectListTheme;
 }
 
+export interface EditorOptions {
+	/** Show horizontal border above editor (default: true) */
+	showTopBorder?: boolean;
+	/** Show horizontal border below editor (default: true) */
+	showBottomBorder?: boolean;
+	/** Show vertical accent line on left side (default: false) */
+	showLeftBorder?: boolean;
+	/** Left padding in characters (default: 0) */
+	paddingLeft?: number;
+	/** Top padding in lines (default: 0) */
+	paddingTop?: number;
+	/** Bottom padding in lines (default: 0) */
+	paddingBottom?: number;
+	/** Custom color function for left border (default: uses theme.borderColor) */
+	leftBorderColor?: (str: string) => string;
+}
+
 export class Editor implements Component {
 	private state: EditorState = {
 		lines: [""],
@@ -33,12 +50,16 @@ export class Editor implements Component {
 	};
 
 	private theme: EditorTheme;
+	private options: EditorOptions;
 
 	// Store last render width for cursor navigation
 	private lastWidth: number = 80;
 
 	// Border color (can be changed dynamically)
 	public borderColor: (str: string) => string;
+
+	// Info line shown below the input area
+	private infoLine: string = "";
 
 	// Autocomplete support
 	private autocompleteProvider?: AutocompleteProvider;
@@ -62,9 +83,25 @@ export class Editor implements Component {
 	public onChange?: (text: string) => void;
 	public disableSubmit: boolean = false;
 
-	constructor(theme: EditorTheme) {
+	constructor(theme: EditorTheme, options?: EditorOptions) {
 		this.theme = theme;
+		this.options = options || {};
 		this.borderColor = theme.borderColor;
+	}
+
+	/**
+	 * Set the info line displayed below the input area.
+	 * Can include ANSI color codes for styling.
+	 */
+	setInfoLine(line: string): void {
+		this.infoLine = line;
+	}
+
+	/**
+	 * Get the current info line.
+	 */
+	getInfoLine(): string {
+		return this.infoLine;
 	}
 
 	setAutocompleteProvider(provider: AutocompleteProvider): void {
@@ -136,18 +173,56 @@ export class Editor implements Component {
 	}
 
 	render(width: number): string[] {
+		// Get options with defaults
+		const showTopBorder = this.options.showTopBorder !== false;
+		const showBottomBorder = this.options.showBottomBorder !== false;
+		const showLeftBorder = this.options.showLeftBorder === true;
+		const paddingLeft = this.options.paddingLeft || 0;
+		const paddingTop = this.options.paddingTop || 0;
+		const paddingBottom = this.options.paddingBottom || 0;
+
+		// Calculate content width (accounting for left border and padding)
+		const leftBorderWidth = showLeftBorder ? 2 : 0; // "│ " = 2 chars
+		const contentWidth = width - leftBorderWidth - paddingLeft;
+
 		// Store width for cursor navigation
-		this.lastWidth = width;
+		this.lastWidth = contentWidth;
 
 		const horizontal = this.borderColor("─");
+		// Use custom left border color if provided, otherwise use theme border color
+		const leftBorderColorFn = this.options.leftBorderColor || this.borderColor;
+		const vertical = leftBorderColorFn("│");
+		const leftPadding = " ".repeat(paddingLeft);
 
-		// Layout the text - use full width
-		const layoutLines = this.layoutText(width);
+		// Helper to create an empty padding line with proper styling
+		const createPaddingLine = (): string => {
+			const emptyContent = " ".repeat(contentWidth);
+			let line: string;
+			if (showLeftBorder) {
+				line = vertical + " " + leftPadding + emptyContent;
+			} else {
+				line = leftPadding + emptyContent;
+			}
+			if (this.theme.bgColor) {
+				line = applyBackgroundToLine(line, width, this.theme.bgColor);
+			}
+			return line;
+		};
+
+		// Layout the text using content width
+		const layoutLines = this.layoutText(contentWidth);
 
 		const result: string[] = [];
 
 		// Render top border
-		result.push(horizontal.repeat(width));
+		if (showTopBorder) {
+			result.push(horizontal.repeat(width));
+		}
+
+		// Render top padding
+		for (let i = 0; i < paddingTop; i++) {
+			result.push(createPaddingLine());
+		}
 
 		// Render each layout line
 		for (const layoutLine of layoutLines) {
@@ -171,7 +246,7 @@ export class Editor implements Component {
 					// lineVisibleWidth stays the same - we're replacing, not adding
 				} else {
 					// Cursor is at the end - check if we have room for the space
-					if (lineVisibleWidth < width) {
+					if (lineVisibleWidth < contentWidth) {
 						// We have room - add highlighted space
 						// Use \x1b[27m (inverse off) instead of \x1b[0m (full reset) to preserve background
 						const cursor = "\x1b[7m \x1b[27m";
@@ -199,18 +274,52 @@ export class Editor implements Component {
 			}
 
 			// Calculate padding based on actual visible width
-			const padding = " ".repeat(Math.max(0, width - lineVisibleWidth));
+			const rightPadding = " ".repeat(Math.max(0, contentWidth - lineVisibleWidth));
 
-			// Render the line (no side borders, just horizontal lines above and below)
-			let line = displayText + padding;
+			// Build the line with optional left border and padding
+			let line: string;
+			if (showLeftBorder) {
+				line = vertical + " " + leftPadding + displayText + rightPadding;
+			} else {
+				line = leftPadding + displayText + rightPadding;
+			}
+
 			if (this.theme.bgColor) {
 				line = applyBackgroundToLine(line, width, this.theme.bgColor);
 			}
 			result.push(line);
 		}
 
+		// Render info line if set (with spacer above it)
+		if (this.infoLine) {
+			// Add spacer line before info line
+			result.push(createPaddingLine());
+
+			const infoLineWidth = visibleWidth(this.infoLine);
+			const infoRightPadding = " ".repeat(Math.max(0, contentWidth - infoLineWidth));
+
+			let infoLineOutput: string;
+			if (showLeftBorder) {
+				infoLineOutput = vertical + " " + leftPadding + this.infoLine + infoRightPadding;
+			} else {
+				infoLineOutput = leftPadding + this.infoLine + infoRightPadding;
+			}
+
+			if (this.theme.bgColor) {
+				infoLineOutput = applyBackgroundToLine(infoLineOutput, width, this.theme.bgColor);
+			}
+			result.push(infoLineOutput);
+		}
+
+		// Render bottom padding
+		for (let i = 0; i < paddingBottom; i++) {
+			result.push(createPaddingLine());
+		}
+
 		// Render bottom border
-		result.push(horizontal.repeat(width));
+		if (showBottomBorder) {
+			result.push(horizontal.repeat(width));
+		}
 
 		// Add autocomplete list if active
 		if (this.isAutocompleting && this.autocompleteList) {
