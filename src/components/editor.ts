@@ -34,6 +34,8 @@ export interface EditorOptions {
 	showLeftBorder?: boolean;
 	/** Left padding in characters inside the editor box (default: 0) */
 	paddingLeft?: number;
+	/** Right padding in characters inside the editor box (default: 0) */
+	paddingRight?: number;
 	/** Top padding in lines (default: 0) */
 	paddingTop?: number;
 	/** Bottom padding in lines (default: 0) */
@@ -184,6 +186,7 @@ export class Editor implements Component {
 		const showBottomBorder = this.options.showBottomBorder !== false;
 		const showLeftBorder = this.options.showLeftBorder === true;
 		const paddingLeft = this.options.paddingLeft || 0;
+		const paddingRight = this.options.paddingRight || 0;
 		const paddingTop = this.options.paddingTop || 0;
 		const paddingBottom = this.options.paddingBottom || 0;
 
@@ -206,7 +209,7 @@ export class Editor implements Component {
 
 		// Calculate content width (accounting for left border and padding)
 		const leftBorderWidth = showLeftBorder ? 2 : 0; // "│ " = 2 chars
-		const contentWidth = effectiveWidth - leftBorderWidth - paddingLeft;
+		const contentWidth = effectiveWidth - leftBorderWidth - paddingLeft - paddingRight;
 
 		// Store width for cursor navigation
 		this.lastWidth = contentWidth;
@@ -216,6 +219,7 @@ export class Editor implements Component {
 		const leftBorderColorFn = this.options.leftBorderColor || this.borderColor;
 		const vertical = leftBorderColorFn("│");
 		const leftPadding = " ".repeat(paddingLeft);
+		const rightPaddingStr = " ".repeat(paddingRight);
 
 		// Calculate the padding needed to fill to full terminal width
 		const remainingWidth = width - marginLeft - effectiveWidth;
@@ -253,9 +257,9 @@ export class Editor implements Component {
 			const emptyContent = " ".repeat(contentWidth);
 			let line: string;
 			if (showLeftBorder) {
-				line = vertical + " " + leftPadding + emptyContent;
+				line = vertical + " " + leftPadding + emptyContent + rightPaddingStr;
 			} else {
-				line = leftPadding + emptyContent;
+				line = leftPadding + emptyContent + rightPaddingStr;
 			}
 			if (this.theme.bgColor) {
 				line = applyBackgroundToLine(line, effectiveWidth, this.theme.bgColor);
@@ -328,14 +332,14 @@ export class Editor implements Component {
 			}
 
 			// Calculate padding based on actual visible width
-			const rightPadding = " ".repeat(Math.max(0, contentWidth - lineVisibleWidth));
+			const lineRightPad = " ".repeat(Math.max(0, contentWidth - lineVisibleWidth));
 
 			// Build the line with optional left border and padding
 			let line: string;
 			if (showLeftBorder) {
-				line = vertical + " " + leftPadding + displayText + rightPadding;
+				line = vertical + " " + leftPadding + displayText + lineRightPad + rightPaddingStr;
 			} else {
-				line = leftPadding + displayText + rightPadding;
+				line = leftPadding + displayText + lineRightPad + rightPaddingStr;
 			}
 
 			if (this.theme.bgColor) {
@@ -350,13 +354,13 @@ export class Editor implements Component {
 			result.push(createPaddingLine());
 
 			const infoLineWidth = visibleWidth(this.infoLine);
-			const infoRightPadding = " ".repeat(Math.max(0, contentWidth - infoLineWidth));
+			const infoRightPad = " ".repeat(Math.max(0, contentWidth - infoLineWidth));
 
 			let infoLineOutput: string;
 			if (showLeftBorder) {
-				infoLineOutput = vertical + " " + leftPadding + this.infoLine + infoRightPadding;
+				infoLineOutput = vertical + " " + leftPadding + this.infoLine + infoRightPad + rightPaddingStr;
 			} else {
-				infoLineOutput = leftPadding + this.infoLine + infoRightPadding;
+				infoLineOutput = leftPadding + this.infoLine + infoRightPad + rightPaddingStr;
 			}
 
 			if (this.theme.bgColor) {
