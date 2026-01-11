@@ -32,7 +32,7 @@ export interface EditorOptions {
 	showBottomBorder?: boolean;
 	/** Show vertical accent line on left side (default: false) */
 	showLeftBorder?: boolean;
-	/** Left padding in characters (default: 0) */
+	/** Left padding in characters inside the editor box (default: 0) */
 	paddingLeft?: number;
 	/** Top padding in lines (default: 0) */
 	paddingTop?: number;
@@ -40,6 +40,12 @@ export interface EditorOptions {
 	paddingBottom?: number;
 	/** Custom color function for left border (default: uses theme.borderColor) */
 	leftBorderColor?: (str: string) => string;
+	/** Maximum width of the editor box (default: full width). Can be a number or a function returning a number. */
+	maxWidth?: number | (() => number);
+	/** Background color function for the area outside the editor box (when maxWidth or marginLeft is set) */
+	outerBgColor?: (str: string) => string;
+	/** Left margin in characters outside the editor box (default: 0). Can be a number or a function returning a number. */
+	marginLeft?: number | (() => number);
 }
 
 export class Editor implements Component {
@@ -181,9 +187,26 @@ export class Editor implements Component {
 		const paddingTop = this.options.paddingTop || 0;
 		const paddingBottom = this.options.paddingBottom || 0;
 
+		// Calculate left margin
+		let marginLeft = 0;
+		if (this.options.marginLeft !== undefined) {
+			marginLeft = typeof this.options.marginLeft === "function"
+				? this.options.marginLeft()
+				: this.options.marginLeft;
+		}
+
+		// Calculate effective width (respecting maxWidth if set, and accounting for margin)
+		let effectiveWidth = width - marginLeft;
+		if (this.options.maxWidth !== undefined) {
+			const maxW = typeof this.options.maxWidth === "function"
+				? this.options.maxWidth()
+				: this.options.maxWidth;
+			effectiveWidth = Math.min(effectiveWidth, maxW);
+		}
+
 		// Calculate content width (accounting for left border and padding)
 		const leftBorderWidth = showLeftBorder ? 2 : 0; // "│ " = 2 chars
-		const contentWidth = width - leftBorderWidth - paddingLeft;
+		const contentWidth = effectiveWidth - leftBorderWidth - paddingLeft;
 
 		// Store width for cursor navigation
 		this.lastWidth = contentWidth;
@@ -193,6 +216,37 @@ export class Editor implements Component {
 		const leftBorderColorFn = this.options.leftBorderColor || this.borderColor;
 		const vertical = leftBorderColorFn("│");
 		const leftPadding = " ".repeat(paddingLeft);
+
+		// Calculate the padding needed to fill to full terminal width
+		const remainingWidth = width - marginLeft - effectiveWidth;
+		const outerBgColor = this.options.outerBgColor;
+
+		// Helper to add left margin and pad a line to full terminal width
+		const padToFullWidth = (line: string): string => {
+			let result = line;
+
+			// Add left margin
+			if (marginLeft > 0) {
+				const leftMarginStr = " ".repeat(marginLeft);
+				if (outerBgColor) {
+					result = outerBgColor(leftMarginStr) + result;
+				} else {
+					result = leftMarginStr + result;
+				}
+			}
+
+			// Add right padding
+			if (remainingWidth > 0) {
+				const padding = " ".repeat(remainingWidth);
+				if (outerBgColor) {
+					result = result + outerBgColor(padding);
+				} else {
+					result = result + padding;
+				}
+			}
+
+			return result;
+		};
 
 		// Helper to create an empty padding line with proper styling
 		const createPaddingLine = (): string => {
@@ -204,9 +258,9 @@ export class Editor implements Component {
 				line = leftPadding + emptyContent;
 			}
 			if (this.theme.bgColor) {
-				line = applyBackgroundToLine(line, width, this.theme.bgColor);
+				line = applyBackgroundToLine(line, effectiveWidth, this.theme.bgColor);
 			}
-			return line;
+			return padToFullWidth(line);
 		};
 
 		// Layout the text using content width
@@ -216,7 +270,7 @@ export class Editor implements Component {
 
 		// Render top border
 		if (showTopBorder) {
-			result.push(horizontal.repeat(width));
+			result.push(padToFullWidth(horizontal.repeat(effectiveWidth)));
 		}
 
 		// Render top padding
@@ -285,9 +339,9 @@ export class Editor implements Component {
 			}
 
 			if (this.theme.bgColor) {
-				line = applyBackgroundToLine(line, width, this.theme.bgColor);
+				line = applyBackgroundToLine(line, effectiveWidth, this.theme.bgColor);
 			}
-			result.push(line);
+			result.push(padToFullWidth(line));
 		}
 
 		// Render info line if set (with spacer above it)
@@ -306,9 +360,9 @@ export class Editor implements Component {
 			}
 
 			if (this.theme.bgColor) {
-				infoLineOutput = applyBackgroundToLine(infoLineOutput, width, this.theme.bgColor);
+				infoLineOutput = applyBackgroundToLine(infoLineOutput, effectiveWidth, this.theme.bgColor);
 			}
-			result.push(infoLineOutput);
+			result.push(padToFullWidth(infoLineOutput));
 		}
 
 		// Render bottom padding
@@ -318,7 +372,7 @@ export class Editor implements Component {
 
 		// Render bottom border
 		if (showBottomBorder) {
-			result.push(horizontal.repeat(width));
+			result.push(padToFullWidth(horizontal.repeat(effectiveWidth)));
 		}
 
 		// Add autocomplete list if active
