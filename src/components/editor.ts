@@ -1527,6 +1527,21 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 	private updateAutocomplete(): void {
 		if (!this.isAutocompleting || !this.autocompleteProvider) return;
 
+		const currentLine = this.state.lines[this.state.cursorLine] || "";
+		const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
+
+		// Check if context has changed from the original trigger
+		// If we were in slash command mode (prefix starts with /) but no longer have /
+		if (this.autocompletePrefix.startsWith("/") && !textBeforeCursor.trimStart().startsWith("/")) {
+			this.cancelAutocomplete();
+			return;
+		}
+		// If we were in @ file reference mode but no longer have @
+		if (this.autocompletePrefix.startsWith("@") && !textBeforeCursor.match(/(?:^|[\s])@[^\s]*$/)) {
+			this.cancelAutocomplete();
+			return;
+		}
+
 		const suggestions = this.autocompleteProvider.getSuggestions(
 			this.state.lines,
 			this.state.cursorLine,
@@ -1539,10 +1554,6 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 			this.notifyAutocompleteChange();
 		} else {
-			// No matches - check if we're still in a valid context before cancelling
-			const currentLine = this.state.lines[this.state.cursorLine] || "";
-			const textBeforeCursor = currentLine.slice(0, this.state.cursorCol);
-
 			this.cancelAutocomplete();
 		}
 	}
