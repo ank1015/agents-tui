@@ -282,7 +282,7 @@ export class TUI extends Container {
 
 	/**
 	 * Composite the modal on top of the background content.
-	 * Centers the modal both horizontally and vertically.
+	 * Centers the modal both horizontally and vertically within the visible viewport.
 	 */
 	private compositeModal(background: string[], terminalWidth: number, terminalHeight: number): string[] {
 		if (!this.modalState) {
@@ -291,7 +291,7 @@ export class TUI extends Container {
 
 		const { component, options } = this.modalState;
 
-		// Pad background to fill terminal height
+		// Pad background to fill terminal height (if shorter)
 		const paddedBg = [...background];
 		while (paddedBg.length < terminalHeight) {
 			paddedBg.push(" ".repeat(terminalWidth));
@@ -311,16 +311,21 @@ export class TUI extends Container {
 		// Ensure all modal lines are padded to exact width
 		const paddedModalLines = modalLines.map(line => padToWidth(line, modalWidth));
 
-		// Calculate center position
+		// Calculate the visible viewport position
+		// When content is taller than terminal, the viewport shows the bottom portion
+		const totalLines = dimmedBg.length;
+		const viewportTop = Math.max(0, totalLines - terminalHeight);
+
+		// Calculate center position WITHIN the visible viewport
 		const modalHeight = paddedModalLines.length;
-		const startRow = Math.max(0, Math.floor((terminalHeight - modalHeight) / 2));
+		const startRow = viewportTop + Math.max(0, Math.floor((terminalHeight - modalHeight) / 2));
 		const startCol = Math.max(0, Math.floor((terminalWidth - modalWidth) / 2));
 
 		// Composite modal onto background
 		const result = [...dimmedBg];
 		for (let i = 0; i < modalHeight; i++) {
 			const row = startRow + i;
-			if (row >= 0 && row < terminalHeight) {
+			if (row >= 0 && row < totalLines) {
 				result[row] = overlayLineAt(
 					dimmedBg[row],
 					paddedModalLines[i],
