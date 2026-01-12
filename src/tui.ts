@@ -7,7 +7,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Terminal } from "./terminal.js";
 import { getCapabilities, setCellDimensions } from "./terminal-image.js";
-import { visibleWidth } from "./utils.js";
+import { dimLine, overlayLineAt, padToWidth, visibleWidth } from "./utils.js";
 
 /**
  * Component interface - all components must implement this
@@ -33,6 +33,23 @@ export interface Component {
 }
 
 export { visibleWidth };
+
+/**
+ * Options for showing a modal
+ */
+export interface ModalOptions {
+	/**
+	 * Width of the modal content area (excluding any borders the modal component adds).
+	 * If not specified, defaults to min(60, terminalWidth - 10)
+	 */
+	width?: number;
+
+	/**
+	 * Whether to dim the background content behind the modal.
+	 * Defaults to true.
+	 */
+	dimBackground?: boolean;
+}
 
 /**
  * Container - a component that contains other components
@@ -83,9 +100,65 @@ export class TUI extends Container {
 	private inputBuffer = ""; // Buffer for parsing terminal responses
 	private cellSizeQueryPending = false;
 
+	// Modal state
+	private modalState: {
+		component: Component;
+		options: ModalOptions;
+		previousFocus: Component | null;
+	} | null = null;
+
 	constructor(terminal: Terminal) {
 		super();
 		this.terminal = terminal;
+	}
+
+	/**
+	 * Show a modal component overlaid on top of the current content.
+	 * The modal will be centered on screen and receive all input focus.
+	 *
+	 * @param component - The modal component to display
+	 * @param options - Modal display options
+	 */
+	showModal(component: Component, options: ModalOptions = {}): void {
+		this.modalState = {
+			component,
+			options: {
+				dimBackground: true,
+				...options,
+			},
+			previousFocus: this.focusedComponent,
+		};
+		this.setFocus(component);
+		this.requestRender();
+	}
+
+	/**
+	 * Hide the currently displayed modal and restore previous focus.
+	 */
+	hideModal(): void {
+		if (!this.modalState) return;
+
+		const previousFocus = this.modalState.previousFocus;
+		this.modalState = null;
+
+		if (previousFocus) {
+			this.setFocus(previousFocus);
+		}
+		this.requestRender();
+	}
+
+	/**
+	 * Check if a modal is currently being displayed.
+	 */
+	isModalVisible(): boolean {
+		return this.modalState !== null;
+	}
+
+	/**
+	 * Get the currently displayed modal component, if any.
+	 */
+	getModalComponent(): Component | null {
+		return this.modalState?.component ?? null;
 	}
 
 	setFocus(component: Component | null): void {
@@ -207,12 +280,70 @@ export class TUI extends Container {
 		return line.includes("\x1b_G") || line.includes("\x1b]1337;File=");
 	}
 
+	/**
+	 * Composite the modal on top of the background content.
+	 * Centers the modal both horizontally and vertically.
+	 */
+	private compositeModal(background: string[], terminalWidth: number, terminalHeight: number): string[] {
+		if (!this.modalState) {
+			return background;
+		}
+
+		const { component, options } = this.modalState;
+
+		// Pad background to fill terminal height
+		const paddedBg = [...background];
+		while (paddedBg.length < terminalHeight) {
+			paddedBg.push(" ".repeat(terminalWidth));
+		}
+
+		// Optionally dim the background
+		const dimmedBg = options.dimBackground !== false
+			? paddedBg.map(line => dimLine(line))
+			: paddedBg;
+
+		// Calculate modal width
+		const modalWidth = options.width ?? Math.min(60, terminalWidth - 10);
+
+		// Render modal content
+		const modalLines = component.render(modalWidth);
+
+		// Ensure all modal lines are padded to exact width
+		const paddedModalLines = modalLines.map(line => padToWidth(line, modalWidth));
+
+		// Calculate center position
+		const modalHeight = paddedModalLines.length;
+		const startRow = Math.max(0, Math.floor((terminalHeight - modalHeight) / 2));
+		const startCol = Math.max(0, Math.floor((terminalWidth - modalWidth) / 2));
+
+		// Composite modal onto background
+		const result = [...dimmedBg];
+		for (let i = 0; i < modalHeight; i++) {
+			const row = startRow + i;
+			if (row >= 0 && row < terminalHeight) {
+				result[row] = overlayLineAt(
+					dimmedBg[row],
+					paddedModalLines[i],
+					startCol,
+					terminalWidth,
+				);
+			}
+		}
+
+		return result;
+	}
+
 	private doRender(): void {
 		const width = this.terminal.columns;
 		const height = this.terminal.rows;
 
 		// Render all components to get new lines
-		const newLines = this.render(width);
+		let newLines = this.render(width);
+
+		// If modal is active, composite it on top
+		if (this.modalState) {
+			newLines = this.compositeModal(newLines, width, height);
+		}
 
 		// Width changed - need full re-render
 		const widthChanged = this.previousWidth !== 0 && this.previousWidth !== width;

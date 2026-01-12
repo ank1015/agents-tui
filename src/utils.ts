@@ -503,6 +503,132 @@ export function applyBackgroundToLine(line: string, width: number, bgFn: (text: 
  * @param ellipsis - Ellipsis string to append when truncating (default: "...")
  * @returns Truncated text with ellipsis if it exceeded maxWidth
  */
+/**
+ * Slice a string by visible character positions (ANSI-aware).
+ * Returns the substring from visible position `start` to `end` (exclusive).
+ * ANSI codes are preserved and tracked across the slice.
+ *
+ * @param str - String to slice (may contain ANSI codes)
+ * @param start - Start visible position (0-indexed)
+ * @param end - End visible position (exclusive)
+ * @returns Sliced string with proper ANSI code handling
+ */
+export function sliceAnsi(str: string, start: number, end: number): string {
+	if (start >= end || !str) {
+		return "";
+	}
+
+	const tracker = new AnsiCodeTracker();
+	let result = "";
+	let currentPos = 0;
+	let i = 0;
+	let startAnsiCodes = ""; // ANSI codes active at start position
+
+	while (i < str.length && currentPos < end) {
+		const ansiResult = extractAnsiCode(str, i);
+		if (ansiResult) {
+			tracker.process(ansiResult.code);
+			// If we're before start, track codes for later
+			if (currentPos < start) {
+				startAnsiCodes = tracker.getActiveCodes();
+			}
+			// If we're in range, include the ANSI code
+			if (currentPos >= start) {
+				result += ansiResult.code;
+			}
+			i += ansiResult.length;
+			continue;
+		}
+
+		// Find grapheme at current position
+		const remaining = str.slice(i);
+		let grapheme = "";
+		for (const seg of segmenter.segment(remaining)) {
+			grapheme = seg.segment;
+			break;
+		}
+
+		if (!grapheme) {
+			i++;
+			continue;
+		}
+
+		const graphemeWidth = visibleWidth(grapheme);
+
+		// Check if this grapheme falls within our range
+		if (currentPos >= start && currentPos < end) {
+			// First character - prepend active ANSI codes
+			if (result === "" && startAnsiCodes) {
+				result = startAnsiCodes;
+			}
+			result += grapheme;
+		}
+
+		currentPos += graphemeWidth;
+		i += grapheme.length;
+	}
+
+	return result;
+}
+
+/**
+ * Overlay a string on top of another at a specific column position.
+ * The overlay replaces characters in the background at the specified position.
+ *
+ * @param bgLine - Background line (may contain ANSI codes)
+ * @param overlay - Overlay string to place on top
+ * @param startCol - Column position to start overlay (0-indexed)
+ * @param totalWidth - Total width of the resulting line
+ * @returns Combined line with overlay on top of background
+ */
+export function overlayLineAt(
+	bgLine: string,
+	overlay: string,
+	startCol: number,
+	totalWidth: number,
+): string {
+	const overlayWidth = visibleWidth(overlay);
+
+	// Get prefix (visible chars 0 to startCol-1 from background)
+	const prefix = sliceAnsi(bgLine, 0, startCol);
+
+	// Get suffix (visible chars after overlay from background)
+	const suffixStart = startCol + overlayWidth;
+	const suffix = sliceAnsi(bgLine, suffixStart, totalWidth);
+
+	// Reset styles at boundaries to prevent bleed
+	// Use \x1b[0m to fully reset before overlay, then reset after
+	return prefix + "\x1b[0m" + overlay + "\x1b[0m" + suffix;
+}
+
+/**
+ * Dim a line by applying the dim ANSI attribute.
+ * Used for creating a dimmed background effect behind modals.
+ *
+ * @param line - Line to dim (may contain ANSI codes)
+ * @returns Dimmed line
+ */
+export function dimLine(line: string): string {
+	// Apply dim at start, reset at end
+	// The dim code is \x1b[2m, undim is \x1b[22m
+	return "\x1b[2m" + line + "\x1b[22m";
+}
+
+/**
+ * Pad a line to exact width with spaces.
+ *
+ * @param line - Line to pad
+ * @param width - Target width
+ * @returns Padded line
+ */
+export function padToWidth(line: string, width: number): string {
+	const visLen = visibleWidth(line);
+	if (visLen >= width) {
+		return line;
+	}
+	return line + " ".repeat(width - visLen);
+}
+
 export function truncateToWidth(text: string, maxWidth: number, ellipsis: string = "..."): string {
 	const textVisibleWidth = visibleWidth(text);
 
