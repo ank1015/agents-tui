@@ -48,6 +48,18 @@ export interface EditorOptions {
 	outerBgColor?: (str: string) => string;
 	/** Left margin in characters outside the editor box (default: 0). Can be a number or a function returning a number. */
 	marginLeft?: number | (() => number);
+	/** When true, autocomplete list is NOT rendered inline - use getAutocompleteState() to render externally */
+	externalAutocomplete?: boolean;
+}
+
+/**
+ * State of the autocomplete for external rendering
+ */
+export interface AutocompleteState {
+	isActive: boolean;
+	items: { value: string; label: string; description?: string }[];
+	selectedIndex: number;
+	prefix: string;
 }
 
 export class Editor implements Component {
@@ -89,6 +101,7 @@ export class Editor implements Component {
 
 	public onSubmit?: (text: string) => void;
 	public onChange?: (text: string) => void;
+	public onAutocompleteChange?: (state: AutocompleteState) => void;
 	public disableSubmit: boolean = false;
 
 	constructor(theme: EditorTheme, options?: EditorOptions) {
@@ -114,6 +127,74 @@ export class Editor implements Component {
 
 	setAutocompleteProvider(provider: AutocompleteProvider): void {
 		this.autocompleteProvider = provider;
+	}
+
+	/**
+	 * Get current autocomplete state for external rendering.
+	 * Only useful when externalAutocomplete option is true.
+	 */
+	getAutocompleteState(): AutocompleteState {
+		if (!this.isAutocompleting || !this.autocompleteList) {
+			return {
+				isActive: false,
+				items: [],
+				selectedIndex: 0,
+				prefix: "",
+			};
+		}
+
+		return {
+			isActive: true,
+			items: this.autocompleteList.getItems(),
+			selectedIndex: this.autocompleteList.getSelectedIndex(),
+			prefix: this.autocompletePrefix,
+		};
+	}
+
+	/**
+	 * Set the selected autocomplete item index (for external control).
+	 */
+	setAutocompleteSelectedIndex(index: number): void {
+		if (this.autocompleteList) {
+			this.autocompleteList.setSelectedIndex(index);
+		}
+	}
+
+	/**
+	 * Apply the currently selected autocomplete item.
+	 * Returns true if an item was applied, false otherwise.
+	 */
+	applySelectedAutocomplete(): boolean {
+		if (!this.isAutocompleting || !this.autocompleteList || !this.autocompleteProvider) {
+			return false;
+		}
+
+		const selected = this.autocompleteList.getSelectedItem();
+		if (!selected) {
+			return false;
+		}
+
+		const result = this.autocompleteProvider.applyCompletion(
+			this.state.lines,
+			this.state.cursorLine,
+			this.state.cursorCol,
+			selected,
+			this.autocompletePrefix,
+		);
+		this.state.lines = result.lines;
+		this.state.cursorLine = result.cursorLine;
+		this.state.cursorCol = result.cursorCol;
+		this.cancelAutocomplete();
+		return true;
+	}
+
+	/**
+	 * Notify external listeners of autocomplete state change.
+	 */
+	private notifyAutocompleteChange(): void {
+		if (this.options.externalAutocomplete && this.onAutocompleteChange) {
+			this.onAutocompleteChange(this.getAutocompleteState());
+		}
 	}
 
 	/**
@@ -379,8 +460,8 @@ export class Editor implements Component {
 			result.push(padToFullWidth(horizontal.repeat(effectiveWidth)));
 		}
 
-		// Add autocomplete list if active
-		if (this.isAutocompleting && this.autocompleteList) {
+		// Add autocomplete list if active (unless external rendering is enabled)
+		if (this.isAutocompleting && this.autocompleteList && !this.options.externalAutocomplete) {
 			const autocompleteResult = this.autocompleteList.render(width);
 			result.push(...autocompleteResult);
 		}
@@ -451,6 +532,7 @@ export class Editor implements Component {
 				// Only pass arrow keys to the list, not Enter/Tab (we handle those directly)
 				if (data === "\x1b[A" || data === "\x1b[B") {
 					this.autocompleteList.handleInput(data);
+					this.notifyAutocompleteChange();
 					return;
 				}
 
@@ -1371,6 +1453,7 @@ export class Editor implements Component {
 			this.autocompletePrefix = suggestions.prefix;
 			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 			this.isAutocompleting = true;
+			this.notifyAutocompleteChange();
 		} else {
 			this.cancelAutocomplete();
 		}
@@ -1421,15 +1504,20 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 			this.autocompletePrefix = suggestions.prefix;
 			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
 			this.isAutocompleting = true;
+			this.notifyAutocompleteChange();
 		} else {
 			this.cancelAutocomplete();
 		}
 	}
 
 	private cancelAutocomplete(): void {
+		const wasActive = this.isAutocompleting;
 		this.isAutocompleting = false;
 		this.autocompleteList = undefined as any;
 		this.autocompletePrefix = "";
+		if (wasActive) {
+			this.notifyAutocompleteChange();
+		}
 	}
 
 	public isShowingAutocomplete(): boolean {
@@ -1449,6 +1537,7 @@ https://github.com/EsotericSoftware/spine-runtimes/actions/runs/19536643416/job/
 			this.autocompletePrefix = suggestions.prefix;
 			// Always create new SelectList to ensure update
 			this.autocompleteList = new SelectList(suggestions.items, 8, this.theme.selectList);
+			this.notifyAutocompleteChange();
 		} else {
 			// No matches - check if we're still in a valid context before cancelling
 			const currentLine = this.state.lines[this.state.cursorLine] || "";

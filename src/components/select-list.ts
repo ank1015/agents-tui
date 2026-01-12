@@ -181,4 +181,12 @@ export class SelectList implements Component {
 		const item = this.filteredItems[this.selectedIndex];
 		return item || null;
 	}
+
+	getItems(): SelectItem[] {
+		return this.filteredItems;
+	}
+
+	getSelectedIndex(): number {
+		return this.selectedIndex;
+	}
 }

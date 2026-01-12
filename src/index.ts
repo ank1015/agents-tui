@@ -11,7 +11,7 @@ export {
 export { Box } from "./components/box.js";
 export { DynamicSpacer } from "./components/dynamic-spacer.js";
 export { FullScreenBox } from "./components/full-screen-box.js";
-export { Editor, type EditorOptions, type EditorTheme } from "./components/editor.js";
+export { Editor, type EditorOptions, type EditorTheme, type AutocompleteState } from "./components/editor.js";
 export { Image, type ImageOptions, type ImageTheme } from "./components/image.js";
 export { Input, type InputOptions } from "./components/input.js";
 export { Loader } from "./components/loader.js";
@@ -81,6 +81,6 @@ export {
 	setCellDimensions,
 	type TerminalCapabilities,
 } from "./terminal-image.js";
-export { type Component, Container, type ModalOptions, TUI } from "./tui.js";
+export { type Component, Container, type ModalOptions, type OverlayOptions, TUI } from "./tui.js";
 // Utilities
 export { dimLine, overlayLineAt, padToWidth, sliceAnsi, truncateToWidth, visibleWidth } from "./utils.js";

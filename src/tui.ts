@@ -52,6 +52,28 @@ export interface ModalOptions {
 }
 
 /**
+ * Options for showing an overlay (like autocomplete)
+ */
+export interface OverlayOptions {
+	/**
+	 * Width of the overlay content area.
+	 * If not specified, uses terminal width.
+	 */
+	width?: number;
+
+	/**
+	 * Number of lines from the bottom of the content where the overlay should appear.
+	 * The overlay will be positioned above this line.
+	 */
+	bottomOffset?: number;
+
+	/**
+	 * Left margin for the overlay (in characters from left edge)
+	 */
+	marginLeft?: number;
+}
+
+/**
  * Container - a component that contains other components
  */
 export class Container implements Component {
@@ -107,6 +129,12 @@ export class TUI extends Container {
 		previousFocus: Component | null;
 	} | null = null;
 
+	// Overlay state (for autocomplete, etc.)
+	private overlayState: {
+		component: Component;
+		options: OverlayOptions;
+	} | null = null;
+
 	constructor(terminal: Terminal) {
 		super();
 		this.terminal = terminal;
@@ -159,6 +187,44 @@ export class TUI extends Container {
 	 */
 	getModalComponent(): Component | null {
 		return this.modalState?.component ?? null;
+	}
+
+	/**
+	 * Show an overlay component positioned above a certain line from bottom.
+	 * Unlike modals, overlays don't change focus and don't dim background.
+	 *
+	 * @param component - The overlay component to display
+	 * @param options - Overlay display options
+	 */
+	showOverlay(component: Component, options: OverlayOptions = {}): void {
+		this.overlayState = {
+			component,
+			options,
+		};
+		this.requestRender();
+	}
+
+	/**
+	 * Hide the currently displayed overlay.
+	 */
+	hideOverlay(): void {
+		if (!this.overlayState) return;
+		this.overlayState = null;
+		this.requestRender();
+	}
+
+	/**
+	 * Check if an overlay is currently being displayed.
+	 */
+	isOverlayVisible(): boolean {
+		return this.overlayState !== null;
+	}
+
+	/**
+	 * Get the currently displayed overlay component, if any.
+	 */
+	getOverlayComponent(): Component | null {
+		return this.overlayState?.component ?? null;
 	}
 
 	setFocus(component: Component | null): void {
@@ -338,12 +404,67 @@ export class TUI extends Container {
 		return result;
 	}
 
+	/**
+	 * Composite an overlay on top of the background content.
+	 * Positions the overlay above a certain line from the bottom of the visible viewport.
+	 */
+	private compositeOverlay(background: string[], terminalWidth: number, terminalHeight: number): string[] {
+		if (!this.overlayState) {
+			return background;
+		}
+
+		const { component, options } = this.overlayState;
+		const bottomOffset = options.bottomOffset ?? 3;
+		const marginLeft = options.marginLeft ?? 0;
+		const overlayWidth = options.width ?? terminalWidth - marginLeft;
+
+		// Render overlay content
+		const overlayLines = component.render(overlayWidth);
+		if (overlayLines.length === 0) {
+			return background;
+		}
+
+		// Ensure all overlay lines are padded to exact width
+		const paddedOverlayLines = overlayLines.map(line => padToWidth(line, overlayWidth));
+
+		// Calculate the visible viewport position
+		const totalLines = background.length;
+		const viewportTop = Math.max(0, totalLines - terminalHeight);
+
+		// Position overlay above the bottomOffset from the bottom of visible viewport
+		// The overlay should appear just above where the editor input is
+		const overlayHeight = paddedOverlayLines.length;
+		const viewportBottom = viewportTop + terminalHeight;
+		const startRow = viewportBottom - bottomOffset - overlayHeight;
+
+		// Composite overlay onto background
+		const result = [...background];
+		for (let i = 0; i < overlayHeight; i++) {
+			const row = startRow + i;
+			if (row >= 0 && row < totalLines) {
+				result[row] = overlayLineAt(
+					background[row],
+					paddedOverlayLines[i],
+					marginLeft,
+					terminalWidth,
+				);
+			}
+		}
+
+		return result;
+	}
+
 	private doRender(): void {
 		const width = this.terminal.columns;
 		const height = this.terminal.rows;
 
 		// Render all components to get new lines
 		let newLines = this.render(width);
+
+		// If overlay is active, composite it on top (before modal)
+		if (this.overlayState) {
+			newLines = this.compositeOverlay(newLines, width, height);
+		}
 
 		// If modal is active, composite it on top
 		if (this.modalState) {
