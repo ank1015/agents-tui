@@ -1,6 +1,6 @@
 {
 	"name": "@ank1015/agents-tui",
-	"version": "0.0.21",
+	"version": "0.0.22",
 	"description": "Terminal User Interface library with differential rendering",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
