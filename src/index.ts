@@ -13,7 +13,7 @@ export { DynamicSpacer } from "./components/dynamic-spacer.js";
 export { FullScreenBox } from "./components/full-screen-box.js";
 export { Editor, type EditorOptions, type EditorTheme } from "./components/editor.js";
 export { Image, type ImageOptions, type ImageTheme } from "./components/image.js";
-export { Input } from "./components/input.js";
+export { Input, type InputOptions } from "./components/input.js";
 export { Loader } from "./components/loader.js";
 export { type DefaultTextStyle, Markdown, type MarkdownTheme } from "./components/markdown.js";
 export { Modal, type ModalComponentOptions, type ModalTheme } from "./components/modal.js";

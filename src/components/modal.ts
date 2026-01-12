@@ -186,7 +186,7 @@ export class Modal implements Component {
 			const headerContent = titleStyled + spacing + hintStyled;
 			result.push(makeLine(headerContent));
 
-			// Separator line below header
+			// Separator line below header or just a spacer
 			if (showSeparator) {
 				const separatorChar = "─";
 				const separatorLine = separatorChar.repeat(contentWidth);
@@ -194,6 +194,9 @@ export class Modal implements Component {
 					? this.theme.separator(separatorLine)
 					: this.theme.border(separatorLine);
 				result.push(makeLine(separatorStyled));
+			} else {
+				// Add empty line as spacer when no separator
+				result.push(makeEmptyLine());
 			}
 		}
 

@@ -3,16 +3,36 @@ import type { Component } from "../tui.js";
 import { visibleWidth } from "../utils.js";
 
 /**
+ * Options for the Input component
+ */
+export interface InputOptions {
+	/** Prompt string displayed before input (default: "> ") */
+	prompt?: string;
+	/** Placeholder text shown when input is empty */
+	placeholder?: string;
+	/** Style function for placeholder text */
+	placeholderStyle?: (text: string) => string;
+}
+
+/**
  * Input component - single-line text input with horizontal scrolling
  */
 export class Input implements Component {
 	private value: string = "";
 	private cursor: number = 0; // Cursor position in the value
+	private options: InputOptions;
 	public onSubmit?: (value: string) => void;
 
 	// Bracketed paste mode buffering
 	private pasteBuffer: string = "";
 	private isInPaste: boolean = false;
+
+	constructor(options: InputOptions = {}) {
+		this.options = {
+			prompt: "> ",
+			...options,
+		};
+	}
 
 	getValue(): string {
 		return this.value;
@@ -21,6 +41,10 @@ export class Input implements Component {
 	setValue(value: string): void {
 		this.value = value;
 		this.cursor = Math.min(this.cursor, value.length);
+	}
+
+	setPlaceholder(placeholder: string): void {
+		this.options.placeholder = placeholder;
 	}
 
 	handleInput(data: string): void {
@@ -192,11 +216,26 @@ export class Input implements Component {
 
 	render(width: number): string[] {
 		// Calculate visible window
-		const prompt = "> ";
-		const availableWidth = width - prompt.length;
+		const prompt = this.options.prompt ?? "";
+		const promptWidth = visibleWidth(prompt);
+		const availableWidth = width - promptWidth;
 
 		if (availableWidth <= 0) {
 			return [prompt];
+		}
+
+		// Show placeholder if value is empty
+		if (this.value.length === 0 && this.options.placeholder) {
+			const placeholderText = this.options.placeholder.slice(0, availableWidth - 2);
+			const styleFunc = this.options.placeholderStyle || ((t: string) => `\x1b[2m${t}\x1b[22m`);
+
+			// Show cursor first, then the full placeholder text (shifted right)
+			const cursorChar = `\x1b[7m \x1b[27m`; // Cursor on space
+			const styledPlaceholder = styleFunc(placeholderText);
+			const padding = " ".repeat(Math.max(0, availableWidth - visibleWidth(placeholderText) - 1));
+			const line = prompt + cursorChar + styledPlaceholder + padding;
+
+			return [line];
 		}
 
 		let visibleText = "";
