@@ -6,7 +6,7 @@ import { padToWidth, visibleWidth } from "../utils.js";
  * Theme for the Modal component
  */
 export interface ModalTheme {
-	/** Style for the modal border characters */
+	/** Style for the modal border characters (only used if showBorder is true) */
 	border: (text: string) => string;
 	/** Background color/style for the modal content area */
 	background: (text: string) => string;
@@ -14,6 +14,8 @@ export interface ModalTheme {
 	title: (text: string) => string;
 	/** Style for the close hint text (e.g., "esc") */
 	closeHint: (text: string) => string;
+	/** Style for the separator line below header */
+	separator?: (text: string) => string;
 }
 
 /**
@@ -24,10 +26,16 @@ export interface ModalComponentOptions {
 	title?: string;
 	/** Close hint displayed on the right side of header (e.g., "esc") */
 	closeHint?: string;
-	/** Whether to show the top border with header. Defaults to true. */
+	/** Whether to show the header with title and close hint. Defaults to true. */
 	showHeader?: boolean;
-	/** Whether to show the outer border. Defaults to true. */
+	/** Whether to show the outer border. Defaults to false. */
 	showBorder?: boolean;
+	/** Horizontal padding (left and right). Defaults to 2. */
+	paddingX?: number;
+	/** Vertical padding (top and bottom). Defaults to 1. */
+	paddingY?: number;
+	/** Whether to show separator line below header. Defaults to true. */
+	showSeparator?: boolean;
 }
 
 /**
@@ -54,7 +62,10 @@ export class Modal implements Component {
 		this.theme = theme;
 		this.options = {
 			showHeader: true,
-			showBorder: true,
+			showBorder: false,
+			paddingX: 2,
+			paddingY: 1,
+			showSeparator: true,
 			...options,
 		};
 	}
@@ -125,21 +136,42 @@ export class Modal implements Component {
 	}
 
 	render(width: number): string[] {
-		const { showHeader, showBorder } = this.options;
+		const { showHeader, showBorder, paddingX = 2, paddingY = 1, showSeparator = true } = this.options;
 		const result: string[] = [];
 
-		// Calculate content width (accounting for borders if shown)
+		// Calculate content width (accounting for borders and padding)
 		const borderWidth = showBorder ? 2 : 0; // 1 char each side
-		const contentWidth = Math.max(1, width - borderWidth);
+		const horizontalPadding = paddingX * 2;
+		const contentWidth = Math.max(1, width - borderWidth - horizontalPadding);
+
+		// Helper to create a padded line with background
+		const makeLine = (content: string): string => {
+			const padding = " ".repeat(paddingX);
+			const paddedContent = padding + padToWidth(content, contentWidth) + padding;
+			if (showBorder) {
+				return this.theme.border("│") + this.theme.background(paddedContent) + this.theme.border("│");
+			}
+			return this.theme.background(paddedContent);
+		};
+
+		// Helper to create an empty padded line
+		const makeEmptyLine = (): string => {
+			return makeLine("");
+		};
+
+		// Top border if shown
+		if (showBorder) {
+			const innerWidth = width - 2;
+			result.push(this.theme.border("┌" + "─".repeat(innerWidth) + "┐"));
+		}
+
+		// Top padding
+		for (let i = 0; i < paddingY; i++) {
+			result.push(makeEmptyLine());
+		}
 
 		// Build header if shown
-		if (showHeader && showBorder) {
-			// Top border: ┌────────────────────────┐
-			result.push(
-				this.theme.border("┌" + "─".repeat(contentWidth) + "┐")
-			);
-
-			// Header line: │ Title              esc │
+		if (showHeader) {
 			const title = this.options.title ?? "";
 			const hint = this.options.closeHint ?? "esc";
 			const titleStyled = this.theme.title(title);
@@ -152,44 +184,36 @@ export class Modal implements Component {
 			const spacing = " ".repeat(spacingNeeded);
 
 			const headerContent = titleStyled + spacing + hintStyled;
-			result.push(
-				this.theme.border("│") +
-				this.theme.background(padToWidth(headerContent, contentWidth)) +
-				this.theme.border("│")
-			);
+			result.push(makeLine(headerContent));
 
-			// Header separator: ├────────────────────────┤
-			result.push(
-				this.theme.border("├" + "─".repeat(contentWidth) + "┤")
-			);
-		} else if (showBorder) {
-			// Just top border without header
-			result.push(
-				this.theme.border("┌" + "─".repeat(contentWidth) + "┐")
-			);
+			// Separator line below header
+			if (showSeparator) {
+				const separatorChar = "─";
+				const separatorLine = separatorChar.repeat(contentWidth);
+				const separatorStyled = this.theme.separator
+					? this.theme.separator(separatorLine)
+					: this.theme.border(separatorLine);
+				result.push(makeLine(separatorStyled));
+			}
 		}
 
 		// Render children content
 		for (const child of this.children) {
 			const childLines = child.render(contentWidth);
 			for (const line of childLines) {
-				if (showBorder) {
-					result.push(
-						this.theme.border("│") +
-						this.theme.background(padToWidth(line, contentWidth)) +
-						this.theme.border("│")
-					);
-				} else {
-					result.push(this.theme.background(padToWidth(line, width)));
-				}
+				result.push(makeLine(line));
 			}
+		}
+
+		// Bottom padding
+		for (let i = 0; i < paddingY; i++) {
+			result.push(makeEmptyLine());
 		}
 
 		// Bottom border if shown
 		if (showBorder) {
-			result.push(
-				this.theme.border("└" + "─".repeat(contentWidth) + "┘")
-			);
+			const innerWidth = width - 2;
+			result.push(this.theme.border("└" + "─".repeat(innerWidth) + "┘"));
 		}
 
 		return result;
